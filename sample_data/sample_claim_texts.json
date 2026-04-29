@@ -1,0 +1,108 @@
+[
+  {
+    "case_name": "simple_rear_end_collision",
+    "description": "Simple rear-end collision at a traffic light",
+    "user_text": "Ik werd van achteren aangereden bij een stoplicht. De achterbumper is beschadigd.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "motor_accident",
+      "risk_level": "low",
+      "manual_review_required": false,
+      "recommended_action": "auto_process",
+      "notes": "Should identify rear-end collision and rear bumper damage. Risk depends on missing document fields."
+    }
+  },
+  {
+    "case_name": "repeated_claim_signal",
+    "description": "User mentions previous similar claim",
+    "user_text": "Ik heb opnieuw schade aan dezelfde bumper. Vorig jaar had ik ook een vergelijkbare claim.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "motor_accident",
+      "risk_level": "high",
+      "manual_review_required": true,
+      "recommended_action": "manual_review",
+      "notes": "Should trigger REPEATED_CLAIM_SIGNAL rule and require manual review."
+    }
+  },
+  {
+    "case_name": "missing_information",
+    "description": "User provides minimal information without specifics",
+    "user_text": "Er is schade aan mijn auto, maar ik weet niet precies waar of hoe het is gebeurd.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "unknown",
+      "risk_level": "unknown",
+      "manual_review_required": true,
+      "recommended_action": "request_more_info",
+      "notes": "Should mark missing critical fields and recommend requesting more information."
+    }
+  },
+  {
+    "case_name": "conflicting_damage_location",
+    "description": "Text describes rear damage but visual analysis shows front damage",
+    "user_text": "De schade zit aan de achterbumper.",
+    "florence_mock": {
+      "visible_damage_area": "front-left"
+    },
+    "expected_behavior": {
+      "claim_type": "motor_accident",
+      "risk_level": "medium",
+      "manual_review_required": true,
+      "recommended_action": "request_more_info",
+      "notes": "Should detect conflict between text and visual source and flag for clarification."
+    }
+  },
+  {
+    "case_name": "parking_damage",
+    "description": "Damage in parking lot, unknown perpetrator",
+    "user_text": "Mijn auto stond in de parkeergarage en toen ik terugkwam was er schade aan de voorkant. Ik weet niet wie het heeft gedaan.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "motor_accident",
+      "risk_level": "medium",
+      "manual_review_required": true,
+      "recommended_action": "request_more_info",
+      "notes": "Hit-and-run scenario - may require additional verification."
+    }
+  },
+  {
+    "case_name": "weather_damage",
+    "description": "Storm damage to vehicle",
+    "user_text": "Tijdens de storm van afgelopen weekend is er een tak op mijn auto gevallen. Er zit een flinke deuk in het dak.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "weather_damage",
+      "risk_level": "low",
+      "manual_review_required": false,
+      "recommended_action": "auto_process",
+      "notes": "Weather damage claim - should be straightforward if documented."
+    }
+  },
+  {
+    "case_name": "theft_attempt",
+    "description": "Attempted break-in to vehicle",
+    "user_text": "Ik heb poging tot inbraak geconstateerd bij mijn auto. Het slot is beschadigd maar er is niets gestolen.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "vandalism",
+      "risk_level": "medium",
+      "manual_review_required": true,
+      "recommended_action": "request_more_info",
+      "notes": "Vandalism claim - may need police report depending on policy."
+    }
+  },
+  {
+    "case_name": "multi_vehicle_accident",
+    "description": "Accident involving three vehicles",
+    "user_text": "Er was een kettingbotsing op de snelweg. Mijn auto was de derde in de rij. De bumper is eraf en de kofferbak is ingedeukt.",
+    "language": "nl",
+    "expected_behavior": {
+      "claim_type": "motor_accident",
+      "risk_level": "medium",
+      "manual_review_required": true,
+      "recommended_action": "request_more_info",
+      "notes": "Multi-vehicle accident - requires detailed documentation of fault determination."
+    }
+  }
+]
