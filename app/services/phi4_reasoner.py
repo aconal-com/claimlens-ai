@@ -89,13 +89,14 @@ class Phi4Reasoner:
 
         return prompt
 
-    def _call_ollama(self, prompt: str, timeout: int = 120) -> str:
+    def _call_ollama(self, prompt: str, connect_timeout: float = 5.0, read_timeout: float = 60.0) -> str:
         """
         Call Ollama API to get Phi-4 response.
 
         Args:
             prompt: The full prompt to send
-            timeout: Request timeout in seconds
+            connect_timeout: Connection timeout in seconds
+            read_timeout: Read timeout in seconds
 
         Returns:
             The model's response text
@@ -111,6 +112,8 @@ class Phi4Reasoner:
                 "top_p": 0.9
             }
         }
+
+        timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout)
 
         with httpx.Client(timeout=timeout) as client:
             response = client.post(url, json=payload)
