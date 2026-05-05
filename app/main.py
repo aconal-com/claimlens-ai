@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.api.routes import router as api_router
@@ -46,6 +47,17 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
+
+# Serve frontend static files
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+    @app.get("/", include_in_schema=False)
+    async def serve_index():
+        """Serve the main frontend page."""
+        from fastapi.responses import FileResponse
+        return FileResponse(os.path.join(frontend_path, "index.html"))
 
 
 @app.get("/")
