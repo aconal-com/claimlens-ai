@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+import time
 from typing import Optional
 
 import pytesseract
@@ -23,13 +24,11 @@ class TesseractOCR:
             return self._available
 
         try:
-            # Check if tesseract command is available
             result = shutil.which("tesseract")
             if result is None:
                 self._available = False
                 return False
 
-            # Try to get tesseract version
             version = pytesseract.get_tesseract_version()
             self._available = True
             return True
@@ -38,25 +37,13 @@ class TesseractOCR:
             return False
 
     def _get_lang_code(self, language: str) -> str:
-        """
-        Get the Tesseract language code for the given language.
-
-        Args:
-            language: Language code (e.g., 'nl', 'eng')
-
-        Returns:
-            Tesseract language code
-        """
+        """Get the Tesseract language code for the given language."""
         if language == "nl":
             return self.settings.tesseract_dutch_lang
         else:
             return self.settings.tesseract_english_lang
 
-    def extract_text(
-        self,
-        image_path: str,
-        language: str = "nl"
-    ) -> dict:
+    def extract_text(self, image_path: str, language: str = "nl") -> dict:
         """
         Extract text from an image using Tesseract OCR.
 
@@ -65,40 +52,35 @@ class TesseractOCR:
             language: Language code (default: 'nl' for Dutch)
 
         Returns:
-            Dictionary with:
-            - source: Always "tesseract"
-            - raw_text: The extracted text
-            - language_used: The language code used
-            - warnings: Any warnings or errors
+            Dictionary with: source, raw_text, language_used, warnings, latency_ms
         """
         warnings = []
+        start = time.time()
 
         if not self.is_available():
             return {
                 "source": "tesseract",
                 "raw_text": "",
                 "language_used": language,
-                "warnings": ["Tesseract is not available"]
+                "warnings": ["Tesseract is not available"],
+                "latency_ms": 0
             }
 
         try:
             lang_code = self._get_lang_code(language)
 
-            # Check if the language is available
             try:
                 pytesseract.get_tesseract_lang_codes(lang_code)
             except Exception:
-                # Fallback to English if Dutch is not available
                 lang_code = self.settings.tesseract_english_lang
                 warnings.append(
                     f"Language '{language}' not available, falling back to English"
                 )
 
-            # Extract text
             text = pytesseract.image_to_string(
                 image_path,
                 lang=lang_code,
-                config="--psm 6"  # Assume uniform block of text
+                config="--psm 6"
             )
 
             # Get detailed data for additional info
@@ -108,14 +90,15 @@ class TesseractOCR:
                 output_type=Output.DICT
             )
 
-            # Try to detect language (best effort)
             detected_lang = self._detect_language(text)
+            ocr_ms = round((time.time() - start) * 1000)
 
             return {
                 "source": "tesseract",
                 "raw_text": text.strip(),
                 "language_used": detected_lang if detected_lang else lang_code,
-                "warnings": warnings
+                "warnings": warnings,
+                "latency_ms": ocr_ms
             }
 
         except Exception as e:
@@ -124,27 +107,17 @@ class TesseractOCR:
                 "source": "tesseract",
                 "raw_text": "",
                 "language_used": language,
-                "warnings": warnings
+                "warnings": warnings,
+                "latency_ms": 0
             }
 
     def _detect_language(self, text: str) -> Optional[str]:
-        """
-        Simple language detection based on common words.
-
-        This is a best-effort detection and not 100% accurate.
-
-        Args:
-            text: Text to analyze
-
-        Returns:
-            Detected language code or None
-        """
+        """Simple language detection based on common words."""
         if not text:
             return None
 
         text_lower = text.lower()
 
-        # Dutch indicators
         dutch_words = [
             "de", "het", "een", "van", "en", "in", "is", "op", "te", "voor",
             "met", "zijn", "dat", "niet", "aan", "er", "maar", "om", "ook",
@@ -153,7 +126,6 @@ class TesseractOCR:
             "beschadigd", "bumper", "voor", "achter", "zijkant"
         ]
 
-        # English indicators
         english_words = [
             "the", "a", "an", "is", "in", "on", "at", "to", "for", "with",
             "of", "and", "or", "but", "from", "by", "this", "that", "it",
@@ -174,19 +146,7 @@ class TesseractOCR:
         return None
 
     def get_detailed_data(self, image_path: str, language: str = "nl") -> dict:
-        """
-        Get detailed OCR data including bounding boxes and confidence.
-
-        Note: We don't fabricate confidence scores, but Tesseract provides
-        metadata that we can include if available.
-
-        Args:
-            image_path: Path to the image file
-            language: Language code
-
-        Returns:
-            Dictionary with detailed OCR data
-        """
+        """Get detailed OCR data including bounding boxes and confidence."""
         try:
             lang_code = self._get_lang_code(language)
             data = pytesseract.image_to_data(

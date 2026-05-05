@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClaimLens AI — Insurance Claims Intake</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #eff6ff;
+      --accent: #10b981;
+      --accent-light: #ecfdf5;
+      --danger: #ef4444;
+      --danger-light: #fef2f2;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+      --shadow-lg: 0 4px 16px rgba(0,0,0,0.1), 0 8px 32px rgba(0,0,0,0.06);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-icon svg { width: 18px; height: 18px; fill: white; }
+    .header-badge {
+      background: var(--accent-light);
+      color: var(--accent);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 99px;
+      letter-spacing: 0.5px;
+    }
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d1d5db;
+    }
+    .status-dot.ok { background: var(--accent); }
+    .status-dot.error { background: var(--danger); }
+
+    /* MAIN */
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* HERO */
+    .hero {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .hero h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.4rem;
+    }
+    .hero p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* CARD */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .card-header {
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-header h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+    .card-header .subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+    .card-body { padding: 1.5rem; }
+
+    /* FORM */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem 1.5rem;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group.full { grid-column: 1 / -1; }
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #374151;
+    }
+    label .optional {
+      font-weight: 400;
+      color: #9ca3af;
+      font-size: 0.75rem;
+    }
+    input, select, textarea {
+      padding: 0.6rem 0.85rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* UPLOAD AREA */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+    .upload-area.has-file { border-color: var(--accent); background: var(--accent-light); }
+    .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .upload-text { font-size: 0.88rem; color: var(--text-muted); }
+    .upload-text strong { color: var(--primary); }
+    .upload-filename {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    #file-input { display: none; }
+
+    /* EXTRACTION MODE */
+    .mode-toggle {
+      display: flex;
+      gap: 0;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 0.55rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .mode-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+    .mode-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 0.3rem;
+    }
+
+    /* SUBMIT */
+    .submit-btn {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 1.5rem;
+    }
+    .submit-btn:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+    .submit-btn .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .submit-btn.loading .spinner { display: block; }
+
+    /* RESULTS */
+    .result-card { display: none; }
+    .result-card.visible { display: block; }
+
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .metric {
+      background: var(--primary-light);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      text-align: center;
+    }
+    .metric-value { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
+    .metric-label { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+    .metric.accent { background: var(--accent-light); }
+    .metric.accent .metric-value { color: var(--accent); }
+    .metric.danger { background: var(--danger-light); }
+    .metric.danger .metric-value { color: var(--danger); }
+
+    /* PIPELINE STEPS */
+    .pipeline-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.9rem;
+      background: var(--bg);
+      border-radius: 8px;
+      font-size: 0.82rem;
+    }
+    .step-icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-icon.done { background: var(--accent); color: white; }
+    .step-icon.skip { background: #d1d5db; color: white; }
+    .step-icon.fail { background: var(--danger); color: white; }
+    .step-icon.running { background: var(--primary); color: white; animation: spin 1s linear infinite; }
+    .step-name { flex: 1; font-weight: 600; }
+    .step-time { font-size: 0.75rem; color: var(--text-muted); }
+    .step-status { font-size: 0.75rem; font-weight: 600; }
+    .step-status.ok { color: var(--accent); }
+    .step-status.fail { color: var(--danger); }
+
+    /* EXTRACTED DATA */
+    .extracted-section { margin-bottom: 1.25rem; }
+    .extracted-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .extracted-title .tag {
+      background: var(--primary);
+      color: white;
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .data-item {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 0.6rem 0.85rem;
+    }
+    .data-item.full { grid-column: 1 / -1; }
+    .data-label { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+    .data-value { font-size: 0.88rem; font-weight: 600; }
+    .data-value.empty { color: #d1d5db; font-style: italic; font-weight: 400; }
+
+    /* DECISION */
+    .decision-box {
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .decision-box.auto { background: var(--accent-light); border: 1.5px solid #6ee7b7; }
+    .decision-box.review { background: #fffbeb; border: 1.5px solid #fcd34d; }
+    .decision-box.reject { background: var(--danger-light); border: 1.5px solid #fca5a5; }
+    .decision-icon { font-size: 1.8rem; flex-shrink: 0; }
+    .decision-text { flex: 1; }
+    .decision-action { font-weight: 800; font-size: 1rem; margin-bottom: 2px; }
+    .decision-reasons { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+    .decision-risk {
+      text-align: center;
+      padding: 0.5rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .risk-low { background: var(--accent-light); color: var(--accent); }
+    .risk-medium { background: #fffbeb; color: #d97706; }
+    .risk-high { background: var(--danger-light); color: var(--danger); }
+    .risk-unknown { background: var(--bg); color: var(--text-muted); }
+
+    /* RAW JSON */
+    .json-toggle {
+      font-size: 0.78rem;
+      color: var(--primary);
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 0.75rem;
+    }
+    .json-output {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      max-height: 400px;
+      overflow: auto;
+      display: none;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .json-output.visible { display: block; }
+
+    /* ERROR */
+    .error-box {
+      background: var(--danger-light);
+      border: 1.5px solid #fca5a5;
+      border-radius: 10px;
+      padding: 1rem;
+      color: var(--danger);
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .metrics-bar { grid-template-columns: repeat(2, 1fr); }
+      .data-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+    </div>
+    ClaimLens AI
+    <span class="header-badge">LOCAL AI POC</span>
+  </div>
+  <div class="api-status">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Checking API...</span>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>European Accident Claim Intake</h1>
+    <p>Upload a European Motor Accident Statement and let local AI models extract, reason, and classify the claim automatically. No data leaves your machine.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Claim Information</h2>
+      <span class="subtitle">All fields optional — we'll extract from the form</span>
+    </div>
+    <div class="card-body">
+      <form id="claimForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Full Name <span class="optional">(optional)</span></label>
+            <input type="text" name="name" placeholder="e.g. Jan de Vries" />
+          </div>
+          <div class="form-group">
+            <label>Phone Number <span class="optional">(optional)</span></label>
+            <input type="tel" name="phone" placeholder="+31 6 1234 5678" />
+          </div>
+          <div class="form-group">
+            <label>Email <span class="optional">(optional)</span></label>
+            <input type="email" name="email" placeholder="jan@example.com" />
+          </div>
+          <div class="form-group">
+            <label>Policy Number <span class="optional">(optional)</span></label>
+            <input type="text" name="policy_number" placeholder="e.g. POL-A-4589021" />
+          </div>
+          <div class="form-group">
+            <label>Car Registration Plate <span class="optional">(optional)</span></label>
+            <input type="text" name="car_plate" placeholder="e.g. NL-AB 123-6" />
+          </div>
+          <div class="form-group">
+            <label>Accident Location <span class="optional">(optional)</span></label>
+            <input type="text" name="accident_location" placeholder="e.g. Kruisdrift / Parkkant, Utrecht" />
+          </div>
+          <div class="form-group full">
+            <label>Additional Notes <span class="optional">(optional)</span></label>
+            <textarea name="notes" placeholder="Describe what happened, or add any extra context..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Upload Accident Form</h2>
+      <span class="subtitle">PDF, PNG, or JPG</span>
+    </div>
+    <div class="card-body">
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">
+          <strong>Click to upload</strong> or drag and drop<br/>
+          PDF, PNG, JPG — max 10MB
+        </div>
+        <div class="upload-filename" id="uploadFilename" style="display:none"></div>
+        <input type="file" id="file-input" name="file" accept=".pdf,.png,.jpg,.jpeg" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Extraction Method</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Choose how to process the form</label>
+          <div class="mode-toggle">
+            <button type="button" class="mode-btn active" data-mode="ocr" onclick="setMode('ocr')">
+              OCR + qwen2.5:7b
+            </button>
+            <button type="button" class="mode-btn" data-mode="vision" onclick="setMode('vision')">
+              Vision (qwen3-vl:4b)
+            </button>
+          </div>
+          <div class="mode-desc" id="modeDesc">
+            Tesseract OCR extracts text, then qwen2.5:7b structures it into JSON. Most reliable.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="submit-btn" id="submitBtn" onclick="submitClaim()">
+    <div class="spinner"></div>
+    <span class="btn-text">Analyze Claim</span>
+  </button>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- RESULTS -->
+  <div class="card result-card" id="resultCard">
+    <div class="card-header">
+      <h2>Analysis Result</h2>
+      <span class="subtitle" id="resultClaimId"></span>
+    </div>
+    <div class="card-body">
+      <div class="metrics-bar" id="metricsBar"></div>
+      <div class="pipeline-steps" id="pipelineSteps"></div>
+      <div class="decision-box" id="decisionBox"></div>
+      <div class="extracted-section">
+        <div class="extracted-title">
+          Extracted Data
+          <span class="tag" id="extractedSource"></span>
+        </div>
+        <div class="data-grid" id="extractedData"></div>
+      </div>
+      <div class="json-toggle" onclick="toggleJson()">
+        <span id="jsonToggleText">Show</span> raw JSON response
+      </div>
+      <div class="json-output" id="jsonOutput"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  let selectedFile = null;
+  let extractionMode = 'ocr';
+  let analysisResult = null;
+
+  const modeDescs = {
+    ocr: 'Tesseract OCR extracts text, then qwen2.5:7b structures it into JSON. Most reliable.',
+    vision: 'qwen3-vl:4b directly analyzes the image. Experimental — needs detailed prompts.'
+  };
+
+  function setMode(mode) {
+    extractionMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.getElementById('modeDesc').textContent = modeDescs[mode];
+  }
+
+  // Upload area
+  const uploadArea = document.getElementById('uploadArea');
+  const fileInput = document.getElementById('file-input');
+
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(f) {
+    if (f.size > 10 * 1024 * 1024) {
+      showError('File too large. Max 10MB.');
+      return;
+    }
+    selectedFile = f;
+    const fn = document.getElementById('uploadFilename');
+    fn.textContent = '✓ ' + f.name;
+    fn.style.display = 'block';
+    uploadArea.classList.add('has-file');
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorBox');
+    el.textContent = msg;
+    el.classList.add('visible');
+    setTimeout(() => el.classList.remove('visible'), 6000);
+  }
+
+  function toggleJson() {
+    const el = document.getElementById('jsonOutput');
+    const txt = document.getElementById('jsonToggleText');
+    el.classList.toggle('visible');
+    txt.textContent = el.classList.contains('visible') ? 'Hide' : 'Show';
+  }
+
+  async function submitClaim() {
+    const btn = document.getElementById('submitBtn');
+    if (!selectedFile) { showError('Please upload an accident form.'); return; }
+
+    btn.classList.add('loading');
+    btn.disabled = true;
+    document.getElementById('resultCard').classList.remove('visible');
+    document.getElementById('errorBox').classList.remove('visible');
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    // Append optional form fields as user_text
+    const form = document.getElementById('claimForm');
+    const fd = new FormData(form);
+    const extras = {};
+    for (const [k, v] of fd.entries()) extras[k] = v;
+    const lines = [];
+    for (const [k, v] of Object.entries(extras)) {
+      if (v) lines.push(`${k}: ${v}`);
+    }
+    formData.append('user_text', lines.join('\n'));
+
+    const endpoint = extractionMode === 'vision'
+      ? '/api/claims/analyze-vision'
+      : '/api/claims/analyze';
+
+    const start = performance.now();
+    let timing = {};
+
+    try {
+      const res = await fetch(endpoint, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      analysisResult = data;
+      timing.total = Math.round(performance.now() - start);
+
+      // Extract step timings from audit
+      renderResults(data, timing);
+    } catch (e) {
+      showError('Analysis failed: ' + e.message);
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  }
+
+  function renderResults(data, timing) {
+    const total = timing.total || 0;
+
+    // Metrics
+    const ocrTime = (data.extraction?.ocr?.latency_ms || 0);
+    const aiTime = (data.ai_reasoning?.latency_ms || 0);
+    document.getElementById('metricsBar').innerHTML = `
+      <div class="metric">
+        <div class="metric-value">${total}ms</div>
+        <div class="metric-label">Total Time</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">${ocrTime}ms</div>
+        <div class="metric-label">OCR Extract</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">${aiTime}ms</div>
+        <div class="metric-label">AI Reasoning</div>
+      </div>
+      <div class="metric accent">
+        <div class="metric-value">${data.decision?.risk_level?.toUpperCase() || '?'}</div>
+        <div class="metric-label">Risk Level</div>
+      </div>
+    `;
+
+    // Pipeline steps
+    const steps = data.audit?.steps_completed || [];
+    const stepColors = {
+      file_upload: '#2563eb', pdf_conversion: '#7c3aed', image_loaded: '#2563eb',
+      tesseract_ocr: '#10b981', fusion: '#f59e0b', phi4_reasoning: '#6366f1',
+      qwen_reasoning: '#6366f1', qwen_vision: '#ec4899',
+      rules_engine: '#f97316', decision_engine: '#14b8a6'
+    };
+    document.getElementById('pipelineSteps').innerHTML = steps.map((s, i) => {
+      const label = s.replace(/_/g, ' ');
+      const color = stepColors[s] || '#6b7280';
+      return `<div class="pipeline-step">
+        <div class="step-icon done" style="background:${color}">✓</div>
+        <span class="step-name">${label}</span>
+        <span class="step-status ok">done</span>
+      </div>`;
+    }).join('');
+
+    // Decision
+    const decision = data.decision || {};
+    const action = decision.recommended_action || 'unknown';
+    const risk = decision.risk_level || 'unknown';
+    const reasons = (decision.decision_reasons || []).join(' ');
+    const decisionIcon = { auto_process: '✅', manual_review: '⚠️', request_more_info: '📋', reject_not_supported: '❌' }[action] || '❓';
+    const decisionClass = { auto_process: 'auto', manual_review: 'review', request_more_info: 'review', reject_not_supported: 'reject' }[action] || 'review';
+    const riskClass = { low: 'risk-low', medium: 'risk-medium', high: 'risk-high', unknown: 'risk-unknown' }[risk] || 'risk-unknown';
+
+    document.getElementById('decisionBox').className = `decision-box ${decisionClass}`;
+    document.getElementById('decisionBox').innerHTML = `
+      <div class="decision-icon">${decisionIcon}</div>
+      <div class="decision-text">
+        <div class="decision-action">${action.replace(/_/g, ' ').toUpperCase()}</div>
+        <div class="decision-reasons">${reasons || 'No reasons provided.'}</div>
+      </div>
+      <div class="decision-risk ${riskClass}">${risk.toUpperCase()} RISK</div>
+    `;
+
+    // Extracted data
+    const ai = data.ai_reasoning?.claim_interpretation || {};
+    const fusion = data.fusion?.normalized_claim_input || {};
+    const ocrRaw = data.extraction?.ocr?.raw_text || '';
+
+    const fields = [
+      { label: 'Accident Date', value: ai.accident_date || fusion.accident_date || '' },
+      { label: 'Accident Time', value: ai.accident_time || fusion.accident_time || '' },
+      { label: 'Location', value: ai.location || fusion.location || '' },
+      { label: 'Driver A (Insured)', value: ai.insured_name_a || fusion.insured_name_a || '' },
+      { label: 'Vehicle A', value: ai.vehicle_a || fusion.vehicle_a || '' },
+      { label: 'Plate A', value: ai.plate_a || fusion.plate_a || '' },
+      { label: 'Insurance A', value: ai.insurance_a || fusion.insurance_a || '' },
+      { label: 'Driver B', value: ai.insured_name_b || fusion.insured_name_b || '' },
+      { label: 'Vehicle B', value: ai.vehicle_b || fusion.vehicle_b || '' },
+      { label: 'Plate B', value: ai.plate_b || fusion.plate_b || '' },
+      { label: 'Damage A', value: ai.damage_a || fusion.damage_a || '', full: true },
+      { label: 'Damage B', value: ai.damage_b || fusion.damage_b || '', full: true },
+      { label: 'Witnesses', value: ai.witnesses || fusion.witnesses || '', full: true },
+      { label: 'Circumstances (A)', value: (ai.circumstances_a || fusion.circumstances_a || '').toString() },
+      { label: 'Circumstances (B)', value: (ai.circumstances_b || fusion.circumstances_b || '').toString() },
+    ];
+
+    document.getElementById('extractedSource').textContent = extractionMode === 'vision' ? 'qwen3-vl:4b' : 'qwen2.5:7b';
+    document.getElementById('extractedData').innerHTML = fields.map(f => `
+      <div class="data-item ${f.full ? 'full' : ''}">
+        <div class="data-label">${f.label}</div>
+        <div class="data-value ${!f.value ? 'empty' : ''}">${f.value || 'Not detected'}</div>
+      </div>
+    `).join('');
+
+    // JSON
+    document.getElementById('jsonOutput').textContent = JSON.stringify(data, null, 2);
+    document.getElementById('resultClaimId').textContent = 'Claim ID: ' + (data.claim_id || '').slice(0, 8);
+
+    document.getElementById('resultCard').classList.add('visible');
+    document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const btn = document.getElementById('submitBtn');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+
+  // Health check
+  async function checkHealth() {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const d = await res.json();
+        document.getElementById('statusDot').className = 'status-dot ok';
+        document.getElementById('statusText').textContent = d.configured_model + ' ready';
+      } else {
+        throw new Error();
+      }
+    } catch {
+      document.getElementById('statusDot').className = 'status-dot error';
+      document.getElementById('statusText').textContent = 'API offline';
+    }
+  }
+
+  checkHealth();
+  setInterval(checkHealth, 30000);
+</script>
+
+</body>
+</html>
