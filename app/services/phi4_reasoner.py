@@ -113,7 +113,7 @@ class Phi4Reasoner:
             }
         }
 
-        timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout)
+        timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout, write=30.0, pool=30.0)
 
         with httpx.Client(timeout=timeout) as client:
             response = client.post(url, json=payload)
