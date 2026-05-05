@@ -17,8 +17,9 @@ Insurance claims intake is often:
 - Prone to over-reliance on black-box AI confidence scores
 
 ClaimLens AI demonstrates a better architecture:
-- Small specialized models for focused tasks (OCR, visual extraction)
-- A reasoning model for interpretation (Phi-4 via Ollama)
+- Tesseract OCR for robust text extraction
+- A reasoning model for structured JSON extraction (qwen2.5:7b via Ollama)
+- Optional vision model for direct image analysis (qwen3-vl:4b via Ollama)
 - Deterministic rules for business decisions
 - Full auditability and explainability
 
@@ -29,7 +30,6 @@ ClaimLens AI demonstrates a better architecture:
 3. **Cost Efficiency**: No per-token API costs. Fixed infrastructure cost.
 4. **Latency**: Local models eliminate network round-trips.
 5. **Compliance**: Easier to audit what's running and how decisions are made.
-6. **Specialization**: Models like Florence-2 for document understanding are purpose-built for this task.
 
 ## Architecture
 
@@ -40,11 +40,10 @@ ClaimLens AI demonstrates a better architecture:
                     ↓
         [Tesseract OCR Extractor]
                     ↓
-        [Florence-2 Visual Extractor]
+        [qwen2.5:7b via Ollama]
+            (structured JSON extraction from OCR text)
                     ↓
             [Fusion Layer]
-                    ↓
-        [Phi-4 Reasoning Layer via Ollama]
                     ↓
             [Rules Engine]
                     ↓
@@ -53,17 +52,40 @@ ClaimLens AI demonstrates a better architecture:
         [Final JSON Response + Audit Log]
 ```
 
+### Optional Vision Pipeline
+
+For direct image analysis without OCR:
+
+```
+[Image] → [qwen3-vl:4b via Ollama]
+              (vision-based extraction, outputs via 'thinking' field)
+```
+
+**Note:** qwen3-vl:4b requires detailed prompt engineering for reliable output. See `journey.md` for full model evaluation history.
+
 ### Layer Responsibilities
 
 | Layer | Purpose | Model/Technology |
 |-------|---------|-----------------|
-| Tesseract OCR | Extract raw textual content | Tesseract (local) |
-| Florence-2 | Visual/semantic document extraction | Hugging Face Transformers |
+| Tesseract OCR | Extract raw textual content from images/PDFs | Tesseract (local) |
+| qwen2.5:7b | Structured reasoning and JSON extraction from OCR text | Ollama (local) |
+| qwen3-vl:4b | Vision-based extraction (optional alternative to OCR) | Ollama (local) |
 | Fusion | Merge outputs, detect conflicts | Deterministic logic |
-| Phi-4 | Structured reasoning over claim data | Ollama (local) |
 | Rules Engine | Deterministic business rules | Python logic |
 | Decision Engine | Final workflow decision | Python logic |
 | Audit Logger | Persistent claim record | JSON files |
+
+### Model Selection History
+
+See `journey.md` for the full evaluation process. Summary:
+
+| Model | Role | Status |
+|-------|------|--------|
+| Florence-2 | Vision extraction | Removed — misidentified forms, wrong fields |
+| gemma4:e4b | Text reasoning | Removed — hallucinated fields, unreliable |
+| phi4 | Text reasoning | Removed — replaced by qwen2.5:7b |
+| **qwen2.5:7b** | Text reasoning | **Active** — clean JSON output, fast, reliable |
+| **qwen3-vl:4b** | Vision extraction | Available — good with detailed prompts, checkbox detection needs work |
 
 ## Important: No Fake Confidence Scores
 
@@ -121,37 +143,29 @@ tesseract --version
 # Install Ollama (macOS/Linux)
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull Phi-4 model (or your configured model)
-ollama pull phi4
+# Pull the reasoning model (required)
+ollama pull qwen2.5:7b
 
-# Or use an alternative model
-ollama pull llama3
-ollama pull mistral
+# Pull the vision model (optional — for direct image extraction)
+ollama pull qwen3-vl:4b
+
+# Verify models
+ollama list
 
 # Start Ollama server
 ollama serve
 ```
 
-The server runs on `http://localhost:11434` by default.
+The server runs on `http://localhost:11434` by default. The default model is configured in `app/config.py` (`ollama_model`, defaults to `gemma4:e4b` — update this to `qwen2.5:7b` for the recommended pipeline).
 
-### 6. Install Florence-2 Dependencies
-
-Florence-2 requires Hugging Face Transformers and PyTorch:
-
-```bash
-pip install torch torchvision transformers
-```
-
-Note: Florence-2 model will be downloaded on first use.
-
-### 7. Configure Environment
+### 6. Configure Environment
 
 ```bash
 cp .env.example .env
 # Edit .env with your settings if needed
 ```
 
-### 8. Run the API
+### 7. Run the API
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -222,7 +236,7 @@ See `sample_data/sample_claim_texts.json` for test cases:
     "source_map": {}
   },
   "ai_reasoning": {
-    "model": "phi4",
+    "model": "qwen2.5:7b",
     "claim_interpretation": {...}
   },
   "rules": {
@@ -249,15 +263,16 @@ See `sample_data/sample_claim_texts.json` for test cases:
 
 ## Known Limitations
 
-1. **Florence-2 is heavy**: First run downloads the model (~1GB). Subsequent runs use local cache.
-2. **Tesseract OCR accuracy**: Handwritten text recognition is limited. Use high-quality scans.
-3. **Phi-4 reasoning**: Model quality depends on Ollama configuration. Some JSON parsing may fail.
+1. **Tesseract OCR accuracy**: Handwritten text recognition is limited. Use high-quality scans.
+2. **qwen3-vl:4b checkbox detection**: Vision model hallucinates checkbox selections. Use OCR + qwen2.5:7b pipeline for reliable checkbox extraction.
+3. **qwen3-vl:4b thinking field**: Model output goes to the `thinking` field instead of `response` — requires special parsing. See `app/services/qwen_vl_extractor.py`.
 4. **Dutch language**: Optimized for Dutch. Other languages may work but are untested.
 5. **Single-page processing**: POC processes first page of PDFs. Multi-page support is structural but not implemented.
 6. **No database**: POC uses local JSON files. Production would add PostgreSQL/MongoDB.
 
 ## Future Improvements
 
+- [ ] Improve checkbox detection (larger vision model or specialized detector)
 - [ ] Multi-page PDF support
 - [ ] Additional language support (English, German, French)
 - [ ] Damage severity classification
@@ -267,19 +282,19 @@ See `sample_data/sample_claim_texts.json` for test cases:
 - [ ] S3-compatible storage for uploaded files
 - [ ] Real-time webhook notifications for decisions
 - [ ] Dashboard for manual review queue
-- [ ] Model fine-tuning pipeline
 
 ## Project Structure
 
 ```
 claimlens-ai/
 ├── README.md
+├── journey.md              # Model selection history and evaluation notes
 ├── requirements.txt
 ├── .env.example
 ├── app/
 │   ├── __init__.py
 │   ├── main.py              # FastAPI application
-│   ├── config.py             # Configuration management
+│   ├── config.py            # Configuration management
 │   ├── api/
 │   │   ├── __init__.py
 │   │   └── routes.py        # API endpoints
@@ -288,18 +303,15 @@ claimlens-ai/
 │   │   └── schemas.py       # Pydantic models
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── document_loader.py    # PDF/image loading
-│   │   ├── image_preprocessor.py # Image preprocessing
-│   │   ├── tesseract_ocr.py      # Tesseract OCR
-│   │   ├── florence_extractor.py # Florence-2 extraction
-│   │   ├── fusion.py             # Fusion layer
-│   │   ├── phi4_reasoner.py      # Phi-4 reasoning
-│   │   ├── rules_engine.py       # Business rules
-│   │   ├── decision_engine.py    # Decision engine
-│   │   └── audit_logger.py       # Audit logging
-│   ├── prompts/
-│   │   ├── phi4_claim_reasoning_prompt.txt
-│   │   └── florence_extraction_prompts.py
+│   │   ├── document_loader.py       # PDF/image loading
+│   │   ├── image_preprocessor.py   # Image preprocessing
+│   │   ├── tesseract_ocr.py         # Tesseract OCR
+│   │   ├── qwen_vl_extractor.py     # qwen3-vl:4b vision extraction
+│   │   ├── phi4_reasoner.py          # (legacy) gemma4:e4b reasoning
+│   │   ├── fusion.py                # Fusion layer
+│   │   ├── rules_engine.py          # Business rules
+│   │   ├── decision_engine.py       # Decision engine
+│   │   └── audit_logger.py          # Audit logging
 │   └── utils/
 │       ├── __init__.py
 │       ├── json_utils.py
@@ -314,6 +326,27 @@ claimlens-ai/
 ├── logs/
 │   └── claims/              # Audit logs
 └── uploads/                 # Temporary file storage
+```
+
+## Ollama Commands Reference
+
+```bash
+# Check installed models
+ollama list
+
+# Pull models
+ollama pull qwen2.5:7b          # Primary reasoning model (required)
+ollama pull qwen3-vl:4b         # Vision model (optional)
+
+# Run interactively
+ollama run qwen2.5:7b
+
+# Check running models
+ollama ps
+
+# Remove unused models
+ollama rm phi4
+ollama rm gemma4:e4b
 ```
 
 ## License
