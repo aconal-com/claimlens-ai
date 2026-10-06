@@ -228,3 +228,75 @@ class TestRulesEngine:
 
         # Should have multiple rules
         assert len(result["applied_rules"]) >= 2
+
+    # ---- Vision-pipeline raw_sources regression tests ------------------
+    #
+    # /api/claims/analyze-vision intentionally skips Tesseract OCR and
+    # Florence-2; qwen3-vl:4b produces the structured output directly.
+    # The rules engine's DOCUMENT_EXTRACTION_FAILED check reads
+    # raw_sources.{ocr_text,florence_structured,user_text} and fires
+    # when all three are empty. The vision route used to skip
+    # raw_sources entirely, so every vision call (without user_text)
+    # tripped the rule → recommended_action=reject_not_supported.
+    #
+    # The fix populates raw_sources with a JSON dump of the model's
+    # structured output as a surrogate ocr_text. These tests pin the
+    # contract from the rules-engine side.
+    def test_vision_pipeline_with_structured_output_does_not_trigger_extraction_failed(self):
+        """A vision-pipeline fusion_result whose raw_sources contain the
+        model's structured output must NOT fire DOCUMENT_EXTRACTION_FAILED,
+        because the model *did* return data — just structured JSON, not
+        raw text."""
+        import json as _json
+
+        structured = {
+            "accident_details": {"date": "14-04-2025", "location": "Utrecht"},
+            "vehicle_a": {"visible_damage": "Rear bumper dented"},
+        }
+        fusion_result = {
+            "normalized_claim_input": {"damage_location": "rear"},
+            "missing_fields": [],
+            "conflicts": [],
+            "raw_sources": {
+                "ocr_text": _json.dumps(structured, default=str),
+                "florence_structured": structured.get("diagram_analysis") or {},
+                "user_text": "",
+            },
+        }
+        result = self.rules.apply_rules(fusion_result, None)
+        rule_ids = [r["rule_id"] for r in result["applied_rules"]]
+        assert "DOCUMENT_EXTRACTION_FAILED" not in rule_ids, (
+            f"vision pipeline should not trip DOCUMENT_EXTRACTION_FAILED, got: {rule_ids}"
+        )
+
+    def test_vision_pipeline_without_raw_sources_triggers_extraction_failed(self):
+        """Sanity check: the old (broken) vision route shape — fusion_result
+        with no raw_sources key at all — still trips DOCUMENT_EXTRACTION_FAILED.
+        If this ever passes, somebody has weakened the rule."""
+        fusion_result = {
+            "normalized_claim_input": {"damage_location": "rear"},
+            "missing_fields": [],
+            "conflicts": [],
+            # no "raw_sources" key — same as the pre-fix vision route.
+        }
+        result = self.rules.apply_rules(fusion_result, None)
+        rule_ids = [r["rule_id"] for r in result["applied_rules"]]
+        assert "DOCUMENT_EXTRACTION_FAILED" in rule_ids
+
+    def test_text_only_pipeline_still_triggers_extraction_failed(self):
+        """Sanity check: when OCR/florence/user_text sources are actually
+        all empty (the real extraction-failed case), the rule must still
+        fire. Otherwise the fix would mask real failures."""
+        fusion_result = {
+            "normalized_claim_input": {},
+            "missing_fields": [],
+            "conflicts": [],
+            "raw_sources": {
+                "ocr_text": "",
+                "florence_structured": {},
+                "user_text": "",
+            },
+        }
+        result = self.rules.apply_rules(fusion_result, None)
+        rule_ids = [r["rule_id"] for r in result["applied_rules"]]
+        assert "DOCUMENT_EXTRACTION_FAILED" in rule_ids

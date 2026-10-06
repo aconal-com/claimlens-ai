@@ -1,5 +1,6 @@
 """API routes for ClaimLens AI."""
 
+import json
 import uuid
 from typing import Optional
 
@@ -442,7 +443,9 @@ async def analyze_vision(
             steps_completed.append("qwen_vision")
         except Exception as e:
             warnings.append(f"qwen3-vl:4b extraction failed: {str(e)}")
-            vision_result = {"source": "qwen3-vl:4b", "structured_output": None, "raw_output": str(e), "warnings": [str(e)], "latency_ms": 0}
+            # qwen_vl_extractor returns ``latency_seconds``; mirror the
+            # key here so audit reads consistent units downstream.
+            vision_result = {"source": "qwen3-vl:4b", "structured_output": None, "raw_output": str(e), "warnings": [str(e)], "latency_seconds": 0}
 
     structured = vision_result.get("structured_output", {}) if vision_result else {}
     fusion_result = {
@@ -480,7 +483,23 @@ async def analyze_vision(
         },
         "missing_fields": [],
         "conflicts": [],
-        "source_map": {"vision": "qwen3-vl:4b"}
+        "source_map": {"vision": "qwen3-vl:4b"},
+        # The vision pipeline intentionally skips Tesseract OCR and
+        # Florence-2; the qwen3-vl:4b model produced the structured
+        # output directly. Populate raw_sources so the rules engine's
+        # DOCUMENT_EXTRACTION_FAILED check does not false-trip on a
+        # valid vision-pipeline claim and route it to
+        # reject_not_supported. We surface:
+        #   - ocr_text: a JSON dump of the model's structured output as
+        #     a surrogate text source (the model *did* return data, it
+        #     just returned structured JSON instead of raw text)
+        #   - florence_structured: the diagram_analysis dict if present
+        #   - user_text: whatever the claimant wrote alongside the upload
+        "raw_sources": {
+            "ocr_text": json.dumps(structured, default=str) if structured else "",
+            "florence_structured": (structured.get("diagram_analysis") or {}) if structured else {},
+            "user_text": user_text or "",
+        },
     }
     steps_completed.append("fusion")
 
@@ -500,7 +519,7 @@ async def analyze_vision(
         input_summary={"file_name": file.filename, "file_type": file.content_type, "user_text_provided": user_text is not None and len(user_text) > 0, "language": language, "pipeline": "vision"},
         extraction={"ocr": {"source": "tesseract", "raw_text": "", "language_used": language, "warnings": ["Vision pipeline: OCR skipped"]}, "vision": vision_result or {}},
         fusion=fusion_result,
-        ai_reasoning={"model": "qwen3-vl:4b", "claim_interpretation": structured, "raw_output": (vision_result.get("raw_output", "")[:500] if vision_result else ""), "latency_ms": (vision_result.get("latency_ms", 0) if vision_result else 0)},
+        ai_reasoning={"model": "qwen3-vl:4b", "claim_interpretation": structured, "raw_output": (vision_result.get("raw_output", "")[:500] if vision_result else ""), "latency_seconds": (vision_result.get("latency_seconds", 0) if vision_result else 0)},
         rules=rules_result,
         decision=decision_result,
         audit={"pipeline_version": settings.pipeline_version, "steps_completed": steps_completed, "warnings": warnings, "total_latency_ms": total_ms}
