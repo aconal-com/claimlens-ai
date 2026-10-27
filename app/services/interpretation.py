@@ -18,13 +18,6 @@ FRAUD_INDICATORS_FIELD = "fraud_indicators"
 
 UNKNOWN_CLAIM_TYPE = "unknown"
 
-#: Fields a producer must supply for the decision engine to work.
-REQUIRED_PRODUCER_FIELDS = (CLAIM_TYPE_FIELD,)
-
-#: Fields a producer may supply; the rules engine degrades gracefully when
-#: they are absent.
-OPTIONAL_PRODUCER_FIELDS = (FRAUD_INDICATORS_FIELD,)
-
 #: Values that all mean "not determined".
 _UNKNOWN_CLAIM_TYPES = {"", "unknown", "none", "null", "n/a", "na"}
 

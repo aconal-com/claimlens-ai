@@ -20,4 +20,4 @@ All notable changes to ClaimLens AI are documented here. The format is based on 
 - `conftest.py` — makes the repo root importable so `pytest` works from a clean checkout.
 
 ### Tests
-- 54 tests passing (was 27, +27). The three new files fail against the pre-fix code and pass after it.
+- 54 tests passing (was 27, +27). 8 of the 27 new tests fail against the pre-fix production code — the other 19 assert the behaviour of the new shared-contract module itself and pass with it in place.
